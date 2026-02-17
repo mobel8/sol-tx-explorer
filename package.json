@@ -1,0 +1,37 @@
+{
+  "name": "sol-tx-explorer",
+  "version": "1.0.0",
+  "description": "Solana Transaction Infrastructure Tool - Bundle orchestration, on-chain optimization, Jupiter/Jito integration",
+  "scripts": {
+    "send-tx": "ts-node scripts/send-tx.ts",
+    "jupiter-swap": "ts-node scripts/jupiter-swap.ts",
+    "jito-bundle": "ts-node scripts/jito-bundle.ts",
+    "optimized-tx": "ts-node scripts/optimized-tx.ts",
+    "setup-wallet": "ts-node scripts/setup-wallet.ts"
+  },
+  "dependencies": {
+    "@coral-xyz/anchor": "^0.29.0",
+    "@jup-ag/api": "^6.0.27",
+    "@solana/spl-token": "^0.4.6",
+    "@solana/web3.js": "^1.95.0",
+    "bs58": "^5.0.0",
+    "dotenv": "^16.4.5",
+    "jito-ts": "^3.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3"
+  },
+  "keywords": [
+    "solana",
+    "blockchain",
+    "rust",
+    "anchor",
+    "jupiter",
+    "jito",
+    "transactions",
+    "defi"
+  ],
+  "license": "MIT"
+}
