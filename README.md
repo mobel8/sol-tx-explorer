@@ -8,6 +8,8 @@
 ![Anchor](https://img.shields.io/badge/Anchor-0.29-blue)
 ![React](https://img.shields.io/badge/React-18-61DAFB?style=flat&logo=react&logoColor=white)
 
+[Live Dashboard](https://app-lemon-five-12.vercel.app) | [GitHub](https://github.com/mobel8/sol-tx-explorer)
+
 ---
 
 ## Overview
@@ -79,7 +81,7 @@ sol-tx-explorer/
 
 ```bash
 # Clone the repository
-git clone https://github.com/YOUR_USERNAME/sol-tx-explorer.git
+git clone https://github.com/mobel8/sol-tx-explorer.git
 cd sol-tx-explorer
 
 # Install root dependencies (scripts)

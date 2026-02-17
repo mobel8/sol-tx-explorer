@@ -142,8 +142,8 @@ Structure Anchor avec 4 instructions :
 
 ### 3.4 Deploiement
 - [x] Build de production OK
-- [ ] Deploy sur Vercel (ou Netlify) — `cd app && npx vercel`
-- [ ] URL publique dans le README
+- [x] Deploy sur Vercel — https://app-lemon-five-12.vercel.app
+- [x] URL publique dans le README
 
 ---
 
@@ -166,9 +166,10 @@ Structure Anchor avec 4 instructions :
 - [x] .env.example pour les variables d'environnement
 
 ### 4.3 Git History
-- [ ] git init + premier commit
-- [ ] Commits atomiques et messages clairs
-- [ ] Au moins 15-20 commits pour montrer une progression
+- [x] git init + premier commit
+- [x] Commits atomiques et messages clairs (26 commits)
+- [x] Au moins 15-20 commits pour montrer une progression
+- [x] Push sur GitHub — https://github.com/mobel8/sol-tx-explorer
 
 ---
 
