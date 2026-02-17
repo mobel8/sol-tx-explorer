@@ -1,3 +1,9 @@
+@import "@fontsource/inter/400.css";
+@import "@fontsource/inter/500.css";
+@import "@fontsource/inter/600.css";
+@import "@fontsource/inter/700.css";
+@import "@fontsource/jetbrains-mono/400.css";
+@import "@fontsource/jetbrains-mono/500.css";
 @import "@solana/wallet-adapter-react-ui/styles.css";
 
 @tailwind base;
@@ -6,18 +12,177 @@
 
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace;
+  font-family: "Inter", system-ui, sans-serif;
   background-color: #0e0e23;
   color: #ffffff;
+  -webkit-font-smoothing: antialiased;
 }
 
+/* ──── Mesh gradient background ──── */
+.bg-mesh {
+  background:
+    radial-gradient(ellipse at 20% 50%, rgba(153, 69, 255, 0.08) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 20%, rgba(20, 241, 149, 0.06) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 80%, rgba(153, 69, 255, 0.04) 0%, transparent 50%),
+    #0e0e23;
+}
+
+/* ──── Floating orbs (decorative) ──── */
+.orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  pointer-events: none;
+  opacity: 0.3;
+}
+.orb-purple {
+  background: #9945ff;
+  width: 300px;
+  height: 300px;
+}
+.orb-green {
+  background: #14f195;
+  width: 200px;
+  height: 200px;
+}
+
+/* ──── Glassmorphism ──── */
+.glass {
+  background: rgba(26, 26, 62, 0.6);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(153, 69, 255, 0.15);
+}
+.glass-dark {
+  background: rgba(14, 14, 35, 0.7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(45, 45, 94, 0.5);
+}
+.glass-header {
+  background: rgba(14, 14, 35, 0.8);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid rgba(45, 45, 94, 0.5);
+}
+
+/* ──── Gradient border ──── */
+.gradient-border {
+  position: relative;
+}
+.gradient-border::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(135deg, #9945ff, #14f195);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+/* ──── Glow effects ──── */
+.glow-purple {
+  box-shadow: 0 0 20px rgba(153, 69, 255, 0.3), 0 0 60px rgba(153, 69, 255, 0.1);
+}
+.glow-green {
+  box-shadow: 0 0 20px rgba(20, 241, 149, 0.3), 0 0 60px rgba(20, 241, 149, 0.1);
+}
+
+/* ──── Text gradients ──── */
+.text-gradient {
+  background: linear-gradient(135deg, #9945ff, #14f195);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.text-gradient-animate {
+  background: linear-gradient(270deg, #9945ff, #14f195, #9945ff);
+  background-size: 200% 200%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: gradient-x 3s ease infinite;
+}
+
+/* ──── Shimmer overlay ──── */
+.shimmer-overlay {
+  position: relative;
+  overflow: hidden;
+}
+.shimmer-overlay::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.03) 50%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 3s linear infinite;
+  pointer-events: none;
+}
+
+/* ──── Range slider ──── */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: linear-gradient(to right, #9945ff var(--range-progress, 0%), #2d2d5e var(--range-progress, 0%));
+  outline: none;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #9945ff, #14f195);
+  cursor: pointer;
+  box-shadow: 0 0 10px rgba(153, 69, 255, 0.5);
+  transition: transform 0.15s ease;
+}
+input[type="range"]::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+}
+input[type="range"]::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #9945ff, #14f195);
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 0 10px rgba(153, 69, 255, 0.5);
+}
+
+/* ──── Scrollbar ──── */
 ::-webkit-scrollbar {
   width: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #1a1a3e;
+  background: rgba(26, 26, 62, 0.5);
 }
 ::-webkit-scrollbar-thumb {
-  background: #9945ff;
+  background: linear-gradient(180deg, #9945ff, #14f195);
   border-radius: 3px;
+}
+
+/* ──── Wallet adapter override ──── */
+.wallet-adapter-button {
+  background: linear-gradient(135deg, #9945ff, #7c2fe6) !important;
+  border-radius: 12px !important;
+  font-family: "Inter", sans-serif !important;
+  font-weight: 600 !important;
+  transition: all 0.2s ease !important;
+}
+.wallet-adapter-button:hover {
+  background: linear-gradient(135deg, #b06aff, #9945ff) !important;
+  box-shadow: 0 0 20px rgba(153, 69, 255, 0.4) !important;
 }

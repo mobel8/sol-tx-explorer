@@ -1,9 +1,13 @@
 import React, { useState } from "react";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { Keypair } from "@solana/web3.js";
+import { motion, AnimatePresence } from "framer-motion";
+import { Trash2, Plus, Layers, Send } from "lucide-react";
 import { BundleItem, BundleResult, submitBundleSequential } from "../services/jito";
 import { TxStatus, TxState } from "../components/TxStatus";
 import { ExplorerLink } from "../components/ExplorerLink";
+import { GlassCard } from "../components/GlassCard";
+import { GradientButton } from "../components/GradientButton";
 import type { TxRecord } from "../hooks/useTransactionHistory";
 
 interface BundleSimProps {
@@ -96,10 +100,14 @@ export const BundleSim: React.FC<BundleSimProps> = ({ onTxComplete }) => {
     }
   };
 
+  const isProcessing = txStatus === "sending" || txStatus === "confirming";
+
   return (
     <div className="max-w-3xl space-y-6">
       <div>
-        <h2 className="text-2xl font-bold mb-1">Bundle Simulator</h2>
+        <h2 className="text-2xl font-bold mb-1 text-gradient">
+          Bundle Simulator
+        </h2>
         <p className="text-gray-400 text-sm">
           Simulate Jito-style transaction bundles — ordered atomic execution
           with validator tips.
@@ -108,83 +116,91 @@ export const BundleSim: React.FC<BundleSimProps> = ({ onTxComplete }) => {
 
       {/* Bundle Items */}
       <div className="space-y-3">
-        {items.map((item, index) => (
-          <div
-            key={item.id}
-            className="bg-solana-card border border-solana-border rounded-xl p-4"
-          >
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-sm font-semibold text-solana-purple">
-                #{index + 1} {item.label}
-              </span>
-              {items.length > 1 && (
-                <button
-                  onClick={() => removeItem(item.id)}
-                  className="text-red-400 hover:text-red-300 text-sm"
-                >
-                  Remove
-                </button>
-              )}
-            </div>
+        <AnimatePresence>
+          {items.map((item, index) => (
+            <motion.div
+              key={item.id}
+              initial={{ opacity: 0, y: 20, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, x: -100, scale: 0.9 }}
+              transition={{ duration: 0.25 }}
+            >
+              <GlassCard hover={false} className="relative">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <span className="w-7 h-7 rounded-lg bg-gradient-to-br from-solana-purple to-solana-green flex items-center justify-center text-xs font-bold text-white">
+                      {index + 1}
+                    </span>
+                    <span className="text-sm font-semibold text-white">
+                      {item.label}
+                    </span>
+                  </div>
+                  {items.length > 1 && (
+                    <motion.button
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.9 }}
+                      onClick={() => removeItem(item.id)}
+                      className="p-1.5 rounded-lg hover:bg-red-500/10 text-red-400/60 hover:text-red-400 transition-colors"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </motion.button>
+                  )}
+                </div>
 
-            <div className="grid grid-cols-3 gap-3">
-              <div>
-                <label className="block text-xs text-gray-500 mb-1">
-                  Recipient
-                </label>
-                <input
-                  type="text"
-                  value={item.recipient}
-                  onChange={(e) =>
-                    updateItem(item.id, "recipient", e.target.value)
-                  }
-                  className="w-full bg-solana-dark border border-solana-border rounded px-2 py-1.5 text-white font-mono text-xs focus:border-solana-purple focus:outline-none"
-                />
-              </div>
-              <div>
-                <label className="block text-xs text-gray-500 mb-1">
-                  Amount (SOL)
-                </label>
-                <input
-                  type="number"
-                  value={item.amountSol}
-                  onChange={(e) =>
-                    updateItem(item.id, "amountSol", parseFloat(e.target.value))
-                  }
-                  step="0.001"
-                  className="w-full bg-solana-dark border border-solana-border rounded px-2 py-1.5 text-white font-mono text-xs focus:border-solana-purple focus:outline-none"
-                />
-              </div>
-              <div>
-                <label className="block text-xs text-gray-500 mb-1">
-                  Priority Fee
-                </label>
-                <input
-                  type="number"
-                  value={item.priorityFee}
-                  onChange={(e) =>
-                    updateItem(
-                      item.id,
-                      "priorityFee",
-                      parseInt(e.target.value)
-                    )
-                  }
-                  className="w-full bg-solana-dark border border-solana-border rounded px-2 py-1.5 text-white font-mono text-xs focus:border-solana-purple focus:outline-none"
-                />
-              </div>
-            </div>
-          </div>
-        ))}
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">
+                      Recipient
+                    </label>
+                    <input
+                      type="text"
+                      value={item.recipient}
+                      onChange={(e) =>
+                        updateItem(item.id, "recipient", e.target.value)
+                      }
+                      className="w-full bg-solana-dark/50 border border-solana-border rounded-lg px-2 py-1.5 text-white font-mono text-xs focus:border-solana-purple focus:outline-none transition-colors"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">
+                      Amount (SOL)
+                    </label>
+                    <input
+                      type="number"
+                      value={item.amountSol}
+                      onChange={(e) =>
+                        updateItem(item.id, "amountSol", parseFloat(e.target.value))
+                      }
+                      step="0.001"
+                      className="w-full bg-solana-dark/50 border border-solana-border rounded-lg px-2 py-1.5 text-white font-mono text-xs focus:border-solana-purple focus:outline-none transition-colors"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">
+                      Priority Fee
+                    </label>
+                    <input
+                      type="number"
+                      value={item.priorityFee}
+                      onChange={(e) =>
+                        updateItem(item.id, "priorityFee", parseInt(e.target.value))
+                      }
+                      className="w-full bg-solana-dark/50 border border-solana-border rounded-lg px-2 py-1.5 text-white font-mono text-xs focus:border-solana-purple focus:outline-none transition-colors"
+                    />
+                  </div>
+                </div>
+              </GlassCard>
+            </motion.div>
+          ))}
+        </AnimatePresence>
       </div>
 
       {/* Add + Tip */}
       <div className="flex items-center gap-4">
-        <button
-          onClick={addItem}
-          className="px-4 py-2 bg-solana-dark border border-solana-border rounded-lg text-gray-400 hover:text-white hover:border-solana-purple text-sm transition-colors"
-        >
-          + Add Transaction
-        </button>
+        <GradientButton onClick={addItem} variant="outline">
+          <Plus className="w-4 h-4" />
+          Add Transaction
+        </GradientButton>
         <div className="flex items-center gap-2">
           <label className="text-sm text-gray-400">Tip:</label>
           <input
@@ -192,66 +208,81 @@ export const BundleSim: React.FC<BundleSimProps> = ({ onTxComplete }) => {
             value={tipAmount}
             onChange={(e) => setTipAmount(parseFloat(e.target.value))}
             step="0.0001"
-            className="w-24 bg-solana-dark border border-solana-border rounded px-2 py-1.5 text-white font-mono text-xs focus:border-solana-purple focus:outline-none"
+            className="w-24 bg-solana-dark/50 border border-solana-border rounded-lg px-2 py-1.5 text-white font-mono text-xs focus:border-solana-purple focus:outline-none transition-colors"
           />
-          <span className="text-xs text-gray-500">SOL</span>
+          <span className="text-xs text-gray-500 font-mono">SOL</span>
         </div>
       </div>
 
       {/* Submit */}
-      <button
+      <GradientButton
         onClick={handleSubmitBundle}
-        disabled={
-          !wallet.publicKey ||
-          txStatus === "sending" ||
-          txStatus === "confirming"
-        }
-        className="w-full bg-solana-purple hover:bg-solana-purple/80 disabled:bg-gray-700 disabled:text-gray-500 text-white font-semibold py-3 rounded-lg transition-colors"
+        disabled={!wallet.publicKey || isProcessing}
+        loading={isProcessing}
+        fullWidth
       >
-        {txStatus === "sending"
+        <Layers className="w-4 h-4" />
+        {isProcessing
           ? "Submitting Bundle..."
           : `Submit Bundle (${items.length} tx + tip)`}
-      </button>
+      </GradientButton>
 
       <TxStatus status={txStatus} error={error} />
 
       {/* Results */}
-      {results.length > 0 && (
-        <div className="bg-solana-card border border-solana-border rounded-xl p-5">
-          <h3 className="text-lg font-semibold mb-3">Bundle Results</h3>
-          <div className="space-y-2">
-            {results.map((r, i) => (
-              <div
-                key={i}
-                className="flex items-center justify-between py-2 px-3 rounded-lg bg-solana-dark/50"
-              >
-                <div className="flex items-center gap-3">
-                  <span
-                    className={`${
-                      r.success ? "text-solana-green" : "text-red-400"
-                    }`}
-                  >
-                    {r.success ? "\u2713" : "\u2717"}
-                  </span>
-                  <span className="text-sm">{r.label}</span>
-                </div>
-                <div className="flex items-center gap-4 text-sm">
-                  <span className="text-gray-500">{r.timeMs}ms</span>
-                  {r.success && <ExplorerLink signature={r.signature} />}
-                  {r.error && (
-                    <span className="text-red-400 text-xs">{r.error}</span>
-                  )}
-                </div>
+      <AnimatePresence>
+        {results.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+          >
+            <GlassCard hover={false}>
+              <div className="flex items-center gap-2 mb-4">
+                <Send className="w-5 h-5 text-solana-purple" />
+                <h3 className="text-lg font-semibold">Bundle Results</h3>
               </div>
-            ))}
-          </div>
-          <div className="mt-3 pt-3 border-t border-solana-border text-sm text-gray-400">
-            Total time:{" "}
-            {results.reduce((sum, r) => sum + r.timeMs, 0)}ms |{" "}
-            {results.filter((r) => r.success).length}/{results.length} successful
-          </div>
-        </div>
-      )}
+              <div className="space-y-2">
+                {results.map((r, i) => (
+                  <motion.div
+                    key={i}
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: i * 0.1 }}
+                    className="flex items-center justify-between py-2.5 px-4 rounded-xl bg-solana-dark/30"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span
+                        className={
+                          r.success ? "text-solana-green" : "text-red-400"
+                        }
+                      >
+                        {r.success ? "\u2713" : "\u2717"}
+                      </span>
+                      <span className="text-sm">{r.label}</span>
+                    </div>
+                    <div className="flex items-center gap-4 text-sm">
+                      <span className="text-gray-500 font-mono">
+                        {r.timeMs}ms
+                      </span>
+                      {r.success && <ExplorerLink signature={r.signature} />}
+                      {r.error && (
+                        <span className="text-red-400 text-xs">{r.error}</span>
+                      )}
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+              <div className="mt-3 pt-3 border-t border-solana-border/50 text-sm text-gray-400 font-mono">
+                Total time:{" "}
+                {results.reduce((sum, r) => sum + r.timeMs, 0)}ms |{" "}
+                {results.filter((r) => r.success).length}/{results.length}{" "}
+                successful
+              </div>
+            </GlassCard>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

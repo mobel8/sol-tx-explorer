@@ -26,7 +26,8 @@ export function useSolanaBalance() {
 
   useEffect(() => {
     refresh();
-    const id = connection.onAccountChange(publicKey!, (account) => {
+    if (!publicKey) return;
+    const id = connection.onAccountChange(publicKey, (account) => {
       setBalance(account.lamports / LAMPORTS_PER_SOL);
     });
     return () => {

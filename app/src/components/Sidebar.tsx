@@ -1,25 +1,35 @@
 import React from "react";
-import { NavLink } from "react-router-dom";
+import { NavLink, useLocation } from "react-router-dom";
+import { motion } from "framer-motion";
+import {
+  LayoutDashboard,
+  ArrowRight,
+  ArrowLeftRight,
+  Layers,
+  Shield,
+} from "lucide-react";
 import { NetworkBadge } from "./NetworkBadge";
 
 const NAV_ITEMS = [
-  { path: "/", label: "Dashboard", icon: "\u25A6" },
-  { path: "/tx-builder", label: "TX Builder", icon: "\u2192" },
-  { path: "/swap", label: "Jupiter Swap", icon: "\u21C4" },
-  { path: "/bundles", label: "Bundle Sim", icon: "\u2630" },
-  { path: "/vault", label: "Vault", icon: "\u26C1" },
+  { path: "/", label: "Dashboard", icon: LayoutDashboard },
+  { path: "/tx-builder", label: "TX Builder", icon: ArrowRight },
+  { path: "/swap", label: "Jupiter Swap", icon: ArrowLeftRight },
+  { path: "/bundles", label: "Bundle Sim", icon: Layers },
+  { path: "/vault", label: "Vault", icon: Shield },
 ];
 
 export const Sidebar: React.FC = () => {
+  const location = useLocation();
+
   return (
-    <aside className="w-64 bg-solana-card border-r border-solana-border min-h-screen p-4 flex flex-col">
+    <aside className="w-64 glass-dark min-h-screen p-4 flex flex-col">
+      {/* Logo */}
       <div className="mb-8">
         <h1 className="text-xl font-bold">
-          <span className="text-solana-purple">Sol</span>
-          <span className="text-solana-green">Tx</span>
-          <span className="text-white"> Explorer</span>
+          <span className="text-gradient-animate text-2xl">SolTx</span>
+          <span className="text-white/80"> Explorer</span>
         </h1>
-        <p className="text-xs text-gray-500 mt-1">
+        <p className="text-xs text-gray-500 mt-1 font-mono">
           Transaction Infrastructure
         </p>
         <div className="mt-3">
@@ -27,32 +37,54 @@ export const Sidebar: React.FC = () => {
         </div>
       </div>
 
+      {/* Navigation */}
       <nav className="flex-1 space-y-1">
-        {NAV_ITEMS.map((item) => (
-          <NavLink
-            key={item.path}
-            to={item.path}
-            className={({ isActive }) =>
-              `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${
-                isActive
-                  ? "bg-solana-purple/20 text-solana-purple border border-solana-purple/30"
-                  : "text-gray-400 hover:text-white hover:bg-white/5"
-              }`
-            }
-          >
-            <span className="text-lg">{item.icon}</span>
-            {item.label}
-          </NavLink>
-        ))}
+        {NAV_ITEMS.map((item) => {
+          const isActive =
+            location.pathname === item.path ||
+            (item.path !== "/" && location.pathname.startsWith(item.path));
+          const Icon = item.icon;
+
+          return (
+            <NavLink
+              key={item.path}
+              to={item.path}
+              className="relative block"
+            >
+              {isActive && (
+                <motion.div
+                  layoutId="sidebar-active"
+                  className="absolute inset-0 rounded-xl bg-solana-purple/15 border border-solana-purple/30"
+                  transition={{ type: "spring", stiffness: 350, damping: 30 }}
+                />
+              )}
+              <div
+                className={`relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-colors ${
+                  isActive
+                    ? "text-solana-purple font-medium"
+                    : "text-gray-400 hover:text-white hover:bg-white/5"
+                }`}
+              >
+                <Icon className="w-4.5 h-4.5" />
+                {item.label}
+              </div>
+            </NavLink>
+          );
+        })}
       </nav>
 
-      <div className="mt-auto pt-4 border-t border-solana-border">
-        <p className="text-xs text-gray-600 text-center">
-          Built with Solana web3.js
-        </p>
-        <p className="text-xs text-gray-600 text-center">
-          Jupiter | Jito | Anchor
-        </p>
+      {/* Footer */}
+      <div className="mt-auto pt-4 border-t border-solana-border/50">
+        <div className="flex flex-wrap gap-1.5 justify-center">
+          {["Solana", "Jupiter", "Jito", "Anchor"].map((tech) => (
+            <span
+              key={tech}
+              className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-solana-purple/10 text-solana-purple/70 border border-solana-purple/20"
+            >
+              {tech}
+            </span>
+          ))}
+        </div>
       </div>
     </aside>
   );
