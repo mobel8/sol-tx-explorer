@@ -2,7 +2,7 @@ import { Connection, PublicKey, LAMPORTS_PER_SOL } from "@solana/web3.js";
 import * as anchor from "@coral-xyz/anchor";
 
 // Program ID - updated after deployment
-const PROGRAM_ID = new PublicKey("11111111111111111111111111111111");
+const PROGRAM_ID = new PublicKey("H6Yyao9ugYXgXddnjtJ3k2qSBiwbTE7C6kwkW5XwPVEM");
 
 export function getVaultPDA(authority: PublicKey): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(

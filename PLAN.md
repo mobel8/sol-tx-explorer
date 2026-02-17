@@ -81,9 +81,9 @@ Structure Anchor avec 4 instructions :
 
 ### 2.3 Deploiement
 - [x] cargo check OK (compile sans erreur)
-- [ ] Build avec `anchor build` (necessite Solana CLI + BPF toolchain)
-- [ ] Deploy sur devnet avec `anchor deploy`
-- [ ] Sauvegarder le program ID
+- [x] Build avec `cargo build-sbf` (SBF binary compiled)
+- [x] Deploy sur devnet — Program ID: `H6Yyao9ugYXgXddnjtJ3k2qSBiwbTE7C6kwkW5XwPVEM`
+- [x] Sauvegarder le program ID
 
 ---
 
