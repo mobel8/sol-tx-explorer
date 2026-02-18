@@ -20,11 +20,14 @@ export const GlassCard: React.FC<GlassCardProps> = ({
 }) => {
   return (
     <motion.div
-      whileHover={hover ? { scale: 1.01, y: -2 } : undefined}
-      transition={{ type: "spring", stiffness: 400, damping: 25 }}
+      whileHover={hover ? { scale: 1.012, y: -3 } : undefined}
+      transition={{ type: "spring", stiffness: 500, damping: 32 }}
       onClick={onClick}
+      // will-change hints the browser to promote this element to its own
+      // GPU compositor layer → jank-free hover animations
+      style={{ willChange: "transform" }}
       className={`
-        glass rounded-2xl p-5
+        glass rounded-2xl p-5 relative
         ${gradient ? "gradient-border" : ""}
         ${shimmer ? "shimmer-overlay" : ""}
         ${hover ? "cursor-default" : ""}

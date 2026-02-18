@@ -4,9 +4,16 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>SolTx Explorer - Solana Transaction Infrastructure</title>
+    <meta name="description" content="SolTx Explorer — Solana transaction infrastructure: TX builder, Jupiter swaps, Jito bundles and on-chain vault." />
+    <meta name="theme-color" content="#0e0e23" />
+    <title>SolTx Explorer — Solana Transaction Infrastructure</title>
+
+    <!-- Preconnect to external APIs for faster first requests -->
+    <link rel="preconnect" href="https://api.devnet.solana.com" />
+    <link rel="preconnect" href="https://quote-api.jup.ag" />
+    <link rel="dns-prefetch" href="https://dallas.testnet.block-engine.jito.wtf" />
   </head>
-  <body class="bg-solana-dark text-white">
+  <body style="background-color:#0e0e23;color:#fff;margin:0">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

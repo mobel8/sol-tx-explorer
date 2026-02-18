@@ -25,20 +25,33 @@ export const MetricsCard: React.FC<MetricsCardProps> = ({
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.1, duration: 0.4, ease: "easeOut" }}
+      transition={{ delay: index * 0.08, duration: 0.35, ease: "easeOut" }}
+      style={{ willChange: "opacity, transform" }}
     >
       <GlassCard shimmer hover>
-        {/* Gradient top border accent */}
-        <div className="absolute top-0 left-4 right-4 h-[2px] bg-gradient-to-r from-solana-purple to-solana-green rounded-full" />
+        {/* Gradient top accent — uses theme CSS variables */}
+        <div
+          className="absolute top-0 left-4 right-4 h-[2px] rounded-full"
+          style={{
+            background: "linear-gradient(to right, var(--primary), var(--secondary))",
+          }}
+        />
 
         <div className="flex items-center justify-between mb-3">
           <span className="text-gray-400 text-sm">{title}</span>
           {Icon && (
-            <div className="p-2 rounded-lg bg-solana-purple/10">
-              <Icon className="w-4 h-4 text-solana-purple" />
+            <div
+              className="p-2 rounded-lg"
+              style={{ background: "rgba(var(--primary-rgb), 0.1)" }}
+            >
+              <Icon
+                className="w-4 h-4"
+                style={{ color: "var(--primary)" }}
+              />
             </div>
           )}
         </div>
+
         <div className="text-2xl font-bold text-white">
           {numericValue !== null ? (
             <AnimatedCounter value={numericValue} />
@@ -46,6 +59,7 @@ export const MetricsCard: React.FC<MetricsCardProps> = ({
             value
           )}
         </div>
+
         {subtitle && (
           <div className="text-xs text-gray-500 mt-1">{subtitle}</div>
         )}

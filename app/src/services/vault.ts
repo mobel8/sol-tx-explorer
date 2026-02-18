@@ -1,8 +1,11 @@
 import { Connection, PublicKey, LAMPORTS_PER_SOL } from "@solana/web3.js";
 import * as anchor from "@coral-xyz/anchor";
 
-// Program ID - updated after deployment
-const PROGRAM_ID = new PublicKey("H6Yyao9ugYXgXddnjtJ3k2qSBiwbTE7C6kwkW5XwPVEM");
+// Program ID loaded from env var — set VITE_PROGRAM_ID in .env.local
+// Falls back to the devnet deployment address
+const PROGRAM_ID = new PublicKey(
+  import.meta.env.VITE_PROGRAM_ID || "H6Yyao9ugYXgXddnjtJ3k2qSBiwbTE7C6kwkW5XwPVEM"
+);
 
 export function getVaultPDA(authority: PublicKey): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
@@ -45,7 +48,6 @@ export async function fetchVaultState(
 
     const balance = accountInfo.lamports / LAMPORTS_PER_SOL;
 
-    // Simplified parsing - in production, use Anchor IDL deserialization
     return {
       authority: authority.toBase58(),
       totalDeposited: 0,

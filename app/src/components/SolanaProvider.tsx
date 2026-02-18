@@ -9,10 +9,13 @@ import { clusterApiUrl } from "@solana/web3.js";
 export const SolanaProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
-  const endpoint = useMemo(() => clusterApiUrl("devnet"), []);
+  const endpoint = useMemo(
+    () => import.meta.env.VITE_RPC_URL || clusterApiUrl("devnet"),
+    []
+  );
 
   return (
-    <ConnectionProvider endpoint={endpoint}>
+    <ConnectionProvider endpoint={endpoint} config={{ commitment: "confirmed" }}>
       <WalletProvider wallets={[]} autoConnect>
         <WalletModalProvider>{children}</WalletModalProvider>
       </WalletProvider>

@@ -1,17 +1,52 @@
-import React from "react";
+import React, { Suspense } from "react";
 import { Routes, Route, useLocation } from "react-router-dom";
-import { AnimatePresence } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 import { Sidebar } from "./components/Sidebar";
 import { PageTransition } from "./components/PageTransition";
-import { Dashboard } from "./pages/Dashboard";
-import { TxBuilder } from "./pages/TxBuilder";
-import { SwapPage } from "./pages/SwapPage";
-import { BundleSim } from "./pages/BundleSim";
-import { VaultManager } from "./pages/VaultManager";
 import { useTransactionHistory } from "./hooks/useTransactionHistory";
 import { NavigationProvider } from "./contexts/NavigationContext";
 
+// ── Lazy-load every page → each becomes a separate JS chunk ──────────────
+const Dashboard = React.lazy(() =>
+  import("./pages/Dashboard").then((m) => ({ default: m.Dashboard }))
+);
+const TxBuilder = React.lazy(() =>
+  import("./pages/TxBuilder").then((m) => ({ default: m.TxBuilder }))
+);
+const SwapPage = React.lazy(() =>
+  import("./pages/SwapPage").then((m) => ({ default: m.SwapPage }))
+);
+const BundleSim = React.lazy(() =>
+  import("./pages/BundleSim").then((m) => ({ default: m.BundleSim }))
+);
+const VaultManager = React.lazy(() =>
+  import("./pages/VaultManager").then((m) => ({ default: m.VaultManager }))
+);
+
+// ── Skeleton loader shown while a page chunk is loading ──────────────────
+const PageLoader: React.FC = () => (
+  <div className="flex items-center justify-center h-72">
+    <div className="flex gap-2 items-end">
+      {[0, 1, 2].map((i) => (
+        <motion.span
+          key={i}
+          className="block w-2 rounded-full"
+          style={{ background: "var(--primary)", height: 8 }}
+          animate={{ scaleY: [1, 2.5, 1] }}
+          transition={{
+            duration: 0.7,
+            repeat: Infinity,
+            delay: i * 0.15,
+            ease: "easeInOut",
+          }}
+        />
+      ))}
+    </div>
+  </div>
+);
+
+// ── Main app ──────────────────────────────────────────────────────────────
 const App: React.FC = () => {
   const txHistory = useTransactionHistory();
   const location = useLocation();
@@ -20,9 +55,30 @@ const App: React.FC = () => {
     <NavigationProvider>
       <div className="flex min-h-screen bg-mesh relative overflow-hidden">
         {/* Decorative orbs — colors driven by CSS theme variables */}
-        <div className="orb orb-primary animate-float" style={{ top: "8%", right: "8%", animationDuration: "7s" }} />
-        <div className="orb orb-secondary animate-float" style={{ bottom: "20%", left: "28%", animationDelay: "3s", animationDuration: "9s" }} />
-        <div className="orb orb-primary animate-float" style={{ top: "55%", right: "35%", opacity: 0.15, width: 160, height: 160, animationDelay: "5s" }} />
+        <div
+          className="orb orb-primary animate-float"
+          style={{ top: "8%", right: "8%", animationDuration: "7s" }}
+        />
+        <div
+          className="orb orb-secondary animate-float"
+          style={{
+            bottom: "20%",
+            left: "28%",
+            animationDelay: "3s",
+            animationDuration: "9s",
+          }}
+        />
+        <div
+          className="orb orb-primary animate-float"
+          style={{
+            top: "55%",
+            right: "35%",
+            opacity: 0.12,
+            width: 150,
+            height: 150,
+            animationDelay: "5s",
+          }}
+        />
 
         <Sidebar />
 
@@ -43,7 +99,9 @@ const App: React.FC = () => {
                   path="/"
                   element={
                     <PageTransition>
-                      <Dashboard txHistory={txHistory} />
+                      <Suspense fallback={<PageLoader />}>
+                        <Dashboard txHistory={txHistory} />
+                      </Suspense>
                     </PageTransition>
                   }
                 />
@@ -51,7 +109,9 @@ const App: React.FC = () => {
                   path="/tx-builder"
                   element={
                     <PageTransition>
-                      <TxBuilder onTxComplete={txHistory.addTransaction} />
+                      <Suspense fallback={<PageLoader />}>
+                        <TxBuilder onTxComplete={txHistory.addTransaction} />
+                      </Suspense>
                     </PageTransition>
                   }
                 />
@@ -59,7 +119,9 @@ const App: React.FC = () => {
                   path="/swap"
                   element={
                     <PageTransition>
-                      <SwapPage onTxComplete={txHistory.addTransaction} />
+                      <Suspense fallback={<PageLoader />}>
+                        <SwapPage onTxComplete={txHistory.addTransaction} />
+                      </Suspense>
                     </PageTransition>
                   }
                 />
@@ -67,7 +129,9 @@ const App: React.FC = () => {
                   path="/bundles"
                   element={
                     <PageTransition>
-                      <BundleSim onTxComplete={txHistory.addTransaction} />
+                      <Suspense fallback={<PageLoader />}>
+                        <BundleSim onTxComplete={txHistory.addTransaction} />
+                      </Suspense>
                     </PageTransition>
                   }
                 />
@@ -75,7 +139,9 @@ const App: React.FC = () => {
                   path="/vault"
                   element={
                     <PageTransition>
-                      <VaultManager />
+                      <Suspense fallback={<PageLoader />}>
+                        <VaultManager />
+                      </Suspense>
                     </PageTransition>
                   }
                 />
