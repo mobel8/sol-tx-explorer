@@ -11,7 +11,7 @@ import { LogProvider } from "./contexts/LogContext";
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <ThemeProvider>
-      <BrowserRouter>
+      <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <SolanaProvider>
           <LogProvider>
             <App />

@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowDownUp, Search, Zap } from "lucide-react";
+import { ArrowDownUp, Search, Zap, FlaskConical } from "lucide-react";
 import {
   TOKEN_LIST,
   getSwapQuote,
@@ -15,6 +15,10 @@ import { GradientButton } from "../components/GradientButton";
 import type { TxRecord } from "../hooks/useTransactionHistory";
 import { useLog } from "../contexts/LogContext";
 
+const BASE58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+const fakeSig = () =>
+  Array.from({ length: 88 }, () => BASE58[Math.floor(Math.random() * 58)]).join("");
+
 interface SwapPageProps {
   onTxComplete: (tx: Omit<TxRecord, "id">) => void;
 }
@@ -23,6 +27,8 @@ export const SwapPage: React.FC<SwapPageProps> = ({ onTxComplete }) => {
   const { connection } = useConnection();
   const { publicKey, signTransaction } = useWallet();
   const { addLog } = useLog();
+
+  const isDevnet = connection.rpcEndpoint.includes("devnet");
 
   const [inputToken, setInputToken] = useState(TOKEN_LIST[0]);
   const [outputToken, setOutputToken] = useState(TOKEN_LIST[1]);
@@ -34,11 +40,12 @@ export const SwapPage: React.FC<SwapPageProps> = ({ onTxComplete }) => {
   const [error, setError] = useState<string>();
   const [quoteLoading, setQuoteLoading] = useState(false);
 
-  const fetchQuote = async () => {
+  const fetchQuote = async (slippageOverride?: number) => {
+    const effectiveSlippage = slippageOverride ?? slippage;
     addLog(
       "INFO",
       `Requesting Jupiter v6 quote`,
-      `${amount} ${inputToken.symbol} → ${outputToken.symbol} · slippage: ${slippage / 100}%`
+      `${amount} ${inputToken.symbol} → ${outputToken.symbol} · slippage: ${effectiveSlippage / 100}%`
     );
     setQuoteLoading(true);
     setError(undefined);
@@ -50,7 +57,7 @@ export const SwapPage: React.FC<SwapPageProps> = ({ onTxComplete }) => {
         inputToken.mint,
         outputToken.mint,
         amountRaw,
-        slippage
+        effectiveSlippage
       );
       setQuote(q);
       const route = q.routePlan.map((r: { swapInfo: { label: string } }) => r.swapInfo.label).join(" › ");
@@ -64,8 +71,40 @@ export const SwapPage: React.FC<SwapPageProps> = ({ onTxComplete }) => {
     }
   };
 
+  const mockSwap = async () => {
+    addLog("INFO", "Demo mode — simulating swap...", "devnet: tx not submitted to chain");
+    setTxStatus("sending");
+    setError(undefined);
+    const startTime = Date.now();
+
+    await new Promise((r) => setTimeout(r, 1200));
+    setTxStatus("confirming");
+
+    await new Promise((r) => setTimeout(r, 1000));
+    const sig = fakeSig();
+    const elapsed = Date.now() - startTime;
+
+    setSignature(sig);
+    setTxStatus("confirmed");
+    addLog("SUCCESS", "Demo swap confirmed (simulated)", `sig: ${sig.slice(0, 10)}... · ${elapsed}ms`);
+
+    onTxComplete({
+      type: "swap",
+      signature: sig,
+      amount: parseFloat(amount),
+      status: "confirmed",
+      timestamp: Date.now(),
+      timeMs: elapsed,
+    });
+  };
+
   const handleSwap = async () => {
     if (!publicKey || !signTransaction || !quote) return;
+
+    if (isDevnet) {
+      await mockSwap();
+      return;
+    }
 
     addLog("INFO", "Building VersionedTransaction via Jupiter v6...", "wrapSol: true · dynamicCU: true");
     setTxStatus("sending");
@@ -105,12 +144,20 @@ export const SwapPage: React.FC<SwapPageProps> = ({ onTxComplete }) => {
 
   return (
     <div className="max-w-2xl space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold mb-1 text-gradient">Jupiter Swap</h2>
-        <p className="text-gray-400 text-sm">
-          Swap tokens using Jupiter Aggregator — finds the best route across all
-          Solana DEXes.
-        </p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h2 className="text-2xl font-bold mb-1 text-gradient">Jupiter Swap</h2>
+          <p className="text-gray-400 text-sm">
+            Swap tokens using Jupiter Aggregator — finds the best route across all
+            Solana DEXes.
+          </p>
+        </div>
+        {isDevnet && (
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs font-mono">
+            <FlaskConical className="w-3.5 h-3.5" />
+            Demo mode · devnet
+          </div>
+        )}
       </div>
 
       <GlassCard hover={false} gradient>
@@ -195,7 +242,7 @@ export const SwapPage: React.FC<SwapPageProps> = ({ onTxComplete }) => {
               {[10, 50, 100, 300].map((bps) => (
                 <button
                   key={bps}
-                  onClick={() => setSlippage(bps)}
+                  onClick={() => { setSlippage(bps); fetchQuote(bps); }}
                   className={`px-3.5 py-1.5 rounded-lg text-xs font-mono transition-all ${
                     slippage === bps
                       ? "bg-solana-purple/20 text-solana-purple border border-solana-purple/40 glow-purple"
@@ -251,7 +298,7 @@ export const SwapPage: React.FC<SwapPageProps> = ({ onTxComplete }) => {
           {/* Buttons */}
           <div className="flex gap-3">
             <GradientButton
-              onClick={fetchQuote}
+              onClick={() => fetchQuote()}
               loading={quoteLoading}
               variant="outline"
               className="flex-1"
@@ -266,7 +313,7 @@ export const SwapPage: React.FC<SwapPageProps> = ({ onTxComplete }) => {
               className="flex-1"
             >
               <Zap className="w-4 h-4" />
-              Swap
+              {isDevnet ? "Swap (Demo)" : "Swap"}
             </GradientButton>
           </div>
 
