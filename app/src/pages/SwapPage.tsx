@@ -13,6 +13,7 @@ import { TxStatus, TxState } from "../components/TxStatus";
 import { GlassCard } from "../components/GlassCard";
 import { GradientButton } from "../components/GradientButton";
 import type { TxRecord } from "../hooks/useTransactionHistory";
+import { useLog } from "../contexts/LogContext";
 
 interface SwapPageProps {
   onTxComplete: (tx: Omit<TxRecord, "id">) => void;
@@ -21,6 +22,7 @@ interface SwapPageProps {
 export const SwapPage: React.FC<SwapPageProps> = ({ onTxComplete }) => {
   const { connection } = useConnection();
   const { publicKey, signTransaction } = useWallet();
+  const { addLog } = useLog();
 
   const [inputToken, setInputToken] = useState(TOKEN_LIST[0]);
   const [outputToken, setOutputToken] = useState(TOKEN_LIST[1]);
@@ -33,6 +35,11 @@ export const SwapPage: React.FC<SwapPageProps> = ({ onTxComplete }) => {
   const [quoteLoading, setQuoteLoading] = useState(false);
 
   const fetchQuote = async () => {
+    addLog(
+      "INFO",
+      `Requesting Jupiter v6 quote`,
+      `${amount} ${inputToken.symbol} → ${outputToken.symbol} · slippage: ${slippage / 100}%`
+    );
     setQuoteLoading(true);
     setError(undefined);
     try {
@@ -46,9 +53,12 @@ export const SwapPage: React.FC<SwapPageProps> = ({ onTxComplete }) => {
         slippage
       );
       setQuote(q);
+      const route = q.routePlan.map((r: { swapInfo: { label: string } }) => r.swapInfo.label).join(" › ");
+      addLog("SUCCESS", "Quote received", `impact: ${q.priceImpactPct}% · via: ${route}`);
     } catch (err: any) {
       setError(err.message);
       setQuote(null);
+      addLog("WARNING", "Jupiter quote failed", String(err?.message ?? err).slice(0, 60));
     } finally {
       setQuoteLoading(false);
     }
@@ -57,6 +67,7 @@ export const SwapPage: React.FC<SwapPageProps> = ({ onTxComplete }) => {
   const handleSwap = async () => {
     if (!publicKey || !signTransaction || !quote) return;
 
+    addLog("INFO", "Building VersionedTransaction via Jupiter v6...", "wrapSol: true · dynamicCU: true");
     setTxStatus("sending");
     setError(undefined);
     const startTime = Date.now();
@@ -71,6 +82,7 @@ export const SwapPage: React.FC<SwapPageProps> = ({ onTxComplete }) => {
 
       setSignature(sig);
       setTxStatus("confirmed");
+      addLog("SUCCESS", "Swap confirmed", `sig: ${sig.slice(0, 10)}... · ${elapsed}ms`);
 
       onTxComplete({
         type: "swap",
@@ -83,6 +95,7 @@ export const SwapPage: React.FC<SwapPageProps> = ({ onTxComplete }) => {
     } catch (err: any) {
       setError(err.message);
       setTxStatus("failed");
+      addLog("ERROR", "Swap failed", String(err?.message ?? err).slice(0, 60));
     }
   };
 

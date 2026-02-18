@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { motion } from "framer-motion";
-import { Shield, Wallet, ArrowDownToLine, ArrowUpFromLine, Terminal, Coins, TrendingUp, Hash } from "lucide-react";
+import { Shield, Wallet, ArrowDownToLine, ArrowUpFromLine, Terminal, Coins, TrendingUp, Hash, AlertTriangle, Play } from "lucide-react";
 import { MetricsCard } from "../components/MetricsCard";
 import { ExplorerLink } from "../components/ExplorerLink";
 import { TxStatus, TxState } from "../components/TxStatus";
@@ -103,16 +103,20 @@ export const VaultManager: React.FC = () => {
             <span className="text-gray-500">Status</span>
             <span
               className={
-                vaultState
-                  ? "text-solana-green font-mono"
-                  : "text-yellow-400 font-mono"
+                !vaultState
+                  ? "text-yellow-400 font-mono"
+                  : vaultState.isPaused
+                  ? "text-red-400 font-mono font-bold"
+                  : "text-solana-green font-mono"
               }
             >
               {loading
                 ? "Loading..."
-                : vaultState
-                ? "Active"
-                : "Not Initialized"}
+                : !vaultState
+                ? "Not Initialized"
+                : vaultState.isPaused
+                ? "⚠ PAUSED"
+                : "Active"}
             </span>
           </div>
         </div>
@@ -212,6 +216,58 @@ export const VaultManager: React.FC = () => {
         </GlassCard>
       </div>
 
+      {/* Kill Switch */}
+      {vaultState && (
+        <GlassCard hover={false} className="border-red-500/20">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-red-400" />
+              <h3 className="font-semibold text-red-400">Emergency Kill Switch</h3>
+            </div>
+            <span
+              className={`text-xs font-mono px-2 py-0.5 rounded-full ${
+                vaultState.isPaused
+                  ? "bg-red-500/20 text-red-400"
+                  : "bg-solana-green/10 text-solana-green"
+              }`}
+            >
+              {vaultState.isPaused ? "PAUSED" : "RUNNING"}
+            </span>
+          </div>
+          <p className="text-xs text-gray-500 mb-4">
+            {vaultState.isPaused
+              ? "Vault is frozen — all deposits and withdrawals are blocked until resumed."
+              : "Instantly freeze all deposits and withdrawals. Irreversible until you resume."}
+          </p>
+          <div className="flex gap-3">
+            <GradientButton
+              fullWidth
+              variant={vaultState.isPaused ? "green" : "outline"}
+              onClick={() => {
+                setError(
+                  vaultState.isPaused
+                    ? "resumeVault() — requires deployed program (anchor deploy)"
+                    : "emergencyPause() — requires deployed program (anchor deploy)"
+                );
+                setTxStatus("failed");
+              }}
+            >
+              {vaultState.isPaused ? (
+                <>
+                  <Play className="w-4 h-4" />
+                  Resume Vault
+                </>
+              ) : (
+                <>
+                  <AlertTriangle className="w-4 h-4" />
+                  Emergency Pause
+                </>
+              )}
+            </GradientButton>
+          </div>
+        </GlassCard>
+      )}
+
       <TxStatus status={txStatus} signature={signature} error={error} />
 
       {/* Architecture Note */}
@@ -239,6 +295,12 @@ export const VaultManager: React.FC = () => {
               <span className="text-solana-purple">&gt;</span>{" "}
               <strong className="text-gray-300">Validation</strong> — Anchor
               constraints ensure only authority can withdraw
+            </p>
+            <p>
+              <span className="text-solana-purple">&gt;</span>{" "}
+              <strong className="text-gray-300">Kill Switch</strong> —{" "}
+              <code className="text-red-400">is_paused: bool</code> blocks all
+              ops; resumable by authority only
             </p>
             <p>
               <span className="text-solana-purple">&gt;</span>{" "}

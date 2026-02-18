@@ -12,6 +12,7 @@ import { TxStatus, TxState } from "../components/TxStatus";
 import { GlassCard } from "../components/GlassCard";
 import { GradientButton } from "../components/GradientButton";
 import type { TxRecord } from "../hooks/useTransactionHistory";
+import { useLog } from "../contexts/LogContext";
 
 interface TxBuilderProps {
   onTxComplete: (tx: Omit<TxRecord, "id">) => void;
@@ -34,6 +35,7 @@ function useRangeProgress(
 export const TxBuilder: React.FC<TxBuilderProps> = ({ onTxComplete }) => {
   const { connection } = useConnection();
   const { publicKey, sendTransaction } = useWallet();
+  const { addLog } = useLog();
 
   const [recipient, setRecipient] = useState("");
   const [amount, setAmount] = useState("0.01");
@@ -62,6 +64,11 @@ export const TxBuilder: React.FC<TxBuilderProps> = ({ onTxComplete }) => {
       return;
     }
 
+    addLog(
+      "INFO",
+      "Building optimized transaction",
+      `to: ${recipient.slice(0, 8)}... · ${amount} SOL · fee: ${priorityFee.toLocaleString()} μl/CU · budget: ${computeUnits.toLocaleString()} CU`
+    );
     setTxStatus("sending");
     setError(undefined);
     const startTime = Date.now();
@@ -89,6 +96,7 @@ export const TxBuilder: React.FC<TxBuilderProps> = ({ onTxComplete }) => {
         })
       );
 
+      addLog("INFO", "Signing & broadcasting to devnet...");
       setTxStatus("confirming");
       const sig = await sendTransaction(tx, connection);
       await connection.confirmTransaction(sig, "confirmed");
@@ -96,6 +104,7 @@ export const TxBuilder: React.FC<TxBuilderProps> = ({ onTxComplete }) => {
       const elapsed = Date.now() - startTime;
       setSignature(sig);
       setTxStatus("confirmed");
+      addLog("SUCCESS", "Transaction confirmed", `sig: ${sig.slice(0, 12)}... · ${elapsed}ms`);
 
       onTxComplete({
         type: "transfer",
@@ -108,6 +117,7 @@ export const TxBuilder: React.FC<TxBuilderProps> = ({ onTxComplete }) => {
     } catch (err: any) {
       setError(err.message);
       setTxStatus("failed");
+      addLog("ERROR", "Transaction failed", String(err?.message ?? err).slice(0, 80));
 
       onTxComplete({
         type: "transfer",

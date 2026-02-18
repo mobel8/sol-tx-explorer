@@ -10,7 +10,8 @@
     "outDir": "./dist",
     "rootDir": ".",
     "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true
+    "forceConsistentCasingInFileNames": true,
+    "types": ["node", "mocha"]
   },
   "include": ["scripts/**/*", "tests/**/*"],
   "exclude": ["node_modules", "dist", "app"]

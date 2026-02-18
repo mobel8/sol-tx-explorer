@@ -8,3 +8,6 @@ target/
 test-ledger/
 .DS_Store
 *.log
+
+# Personal notes — not for public repo
+ENTRETIEN_SURVIE.md

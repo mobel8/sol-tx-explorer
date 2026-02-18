@@ -6,13 +6,16 @@ import App from "./App";
 import "./index.css";
 import { SolanaProvider } from "./components/SolanaProvider";
 import { ThemeProvider } from "./contexts/ThemeContext";
+import { LogProvider } from "./contexts/LogContext";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <ThemeProvider>
       <BrowserRouter>
         <SolanaProvider>
-          <App />
+          <LogProvider>
+            <App />
+          </LogProvider>
         </SolanaProvider>
       </BrowserRouter>
     </ThemeProvider>

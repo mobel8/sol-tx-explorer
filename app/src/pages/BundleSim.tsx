@@ -3,12 +3,13 @@ import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { Keypair } from "@solana/web3.js";
 import { motion, AnimatePresence } from "framer-motion";
 import { Trash2, Plus, Layers, Send } from "lucide-react";
-import { BundleItem, BundleResult, submitBundleSequential } from "../services/jito";
+import { BundleItem, BundleResult, submitBundleDevnetSim } from "../services/jito";
 import { TxStatus, TxState } from "../components/TxStatus";
 import { ExplorerLink } from "../components/ExplorerLink";
 import { GlassCard } from "../components/GlassCard";
 import { GradientButton } from "../components/GradientButton";
 import type { TxRecord } from "../hooks/useTransactionHistory";
+import { useLog } from "../contexts/LogContext";
 
 interface BundleSimProps {
   onTxComplete: (tx: Omit<TxRecord, "id">) => void;
@@ -17,6 +18,7 @@ interface BundleSimProps {
 export const BundleSim: React.FC<BundleSimProps> = ({ onTxComplete }) => {
   const { connection } = useConnection();
   const wallet = useWallet();
+  const { addLog } = useLog();
 
   const [items, setItems] = useState<BundleItem[]>([
     {
@@ -66,12 +68,21 @@ export const BundleSim: React.FC<BundleSimProps> = ({ onTxComplete }) => {
   const handleSubmitBundle = async () => {
     if (!wallet.publicKey || !wallet.signTransaction) return;
 
+    addLog(
+      "INFO",
+      `Serializing bundle: ${items.length} tx + tip`,
+      `tip: ${tipAmount} SOL · mode: devnet sim (mainnet → searcherClient.sendBundle)`
+    );
+    setTimeout(
+      () => addLog("INFO", "Submitting to Jito Block Engine...", "atomic ordering guaranteed on mainnet"),
+      220
+    );
     setTxStatus("sending");
     setError(undefined);
     setResults([]);
 
     try {
-      const bundleResults = await submitBundleSequential(
+      const bundleResults = await submitBundleDevnetSim(
         connection,
         items,
         wallet,
@@ -81,6 +92,26 @@ export const BundleSim: React.FC<BundleSimProps> = ({ onTxComplete }) => {
       setResults(bundleResults);
       const allSuccess = bundleResults.every((r) => r.success);
       setTxStatus(allSuccess ? "confirmed" : "failed");
+
+      bundleResults.forEach((r) => {
+        if (r.success) {
+          addLog(
+            "SUCCESS",
+            `${r.label} confirmed`,
+            `sig: ${r.signature.slice(0, 10)}... · ${r.timeMs}ms`
+          );
+        } else {
+          addLog("ERROR", `${r.label} failed`, String(r.error ?? "unknown").slice(0, 60));
+        }
+      });
+
+      const successCount = bundleResults.filter((r) => r.success).length;
+      const totalMs = bundleResults.reduce((s, r) => s + r.timeMs, 0);
+      addLog(
+        allSuccess ? "SUCCESS" : "WARNING",
+        `Bundle complete: ${successCount}/${bundleResults.length} confirmed`,
+        `total: ${totalMs}ms`
+      );
 
       bundleResults.forEach((r) => {
         if (r.success) {
@@ -97,6 +128,7 @@ export const BundleSim: React.FC<BundleSimProps> = ({ onTxComplete }) => {
     } catch (err: any) {
       setError(err.message);
       setTxStatus("failed");
+      addLog("ERROR", "Bundle submission failed", String(err?.message ?? err).slice(0, 60));
     }
   };
 

@@ -1,13 +1,16 @@
-import React, { Suspense } from "react";
+import React, { Suspense, useEffect } from "react";
 import { Routes, Route, useLocation } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
+import { useWallet } from "@solana/wallet-adapter-react";
 import { Sidebar } from "./components/Sidebar";
 import { PageTransition } from "./components/PageTransition";
+import { Terminal, TERMINAL_OPEN_H, TERMINAL_CLOSED_H } from "./components/Terminal";
 import { useTransactionHistory } from "./hooks/useTransactionHistory";
 import { NavigationProvider } from "./contexts/NavigationContext";
+import { useLog } from "./contexts/LogContext";
 
-// ── Lazy-load every page → each becomes a separate JS chunk ──────────────
+// ── Lazy-load every page → each becomes a separate JS chunk ──────────────────
 const Dashboard = React.lazy(() =>
   import("./pages/Dashboard").then((m) => ({ default: m.Dashboard }))
 );
@@ -24,7 +27,7 @@ const VaultManager = React.lazy(() =>
   import("./pages/VaultManager").then((m) => ({ default: m.VaultManager }))
 );
 
-// ── Skeleton loader shown while a page chunk is loading ──────────────────
+// ── Skeleton loader shown while a page chunk is loading ──────────────────────
 const PageLoader: React.FC = () => (
   <div className="flex items-center justify-center h-72">
     <div className="flex gap-2 items-end">
@@ -46,14 +49,76 @@ const PageLoader: React.FC = () => (
   </div>
 );
 
-// ── Main app ──────────────────────────────────────────────────────────────
+// ── Invisible component: watches wallet state and emits log events ────────────
+const WalletLogger: React.FC = () => {
+  const { publicKey, wallet } = useWallet();
+  const { addLog } = useLog();
+
+  useEffect(() => {
+    if (publicKey) {
+      const pk = publicKey.toBase58();
+      addLog(
+        "SUCCESS",
+        `${wallet?.adapter.name ?? "Wallet"} connected`,
+        `pubkey: ${pk.slice(0, 8)}...${pk.slice(-6)}`
+      );
+    }
+  }, [publicKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return null;
+};
+
+// ── Route → terminal log mapping ──────────────────────────────────────────────
+const ROUTE_LOGS: Record<string, (addLog: ReturnType<typeof useLog>["addLog"]) => void> = {
+  "/": (add) => add("INFO", "Dashboard loaded", "metrics: balance · tx history · network"),
+  "/tx-builder": (add) => add("INFO", "TX Builder ready", "ComputeBudgetProgram + SystemProgram"),
+  "/swap": (add) => add("INFO", "Jupiter Swap initialized", "API v6 · quote-api.jup.ag · VersionedTransaction"),
+  "/bundles": (add) => {
+    add("INFO", "Jito Bundle Simulator loaded");
+    setTimeout(
+      () => add("INFO", "Jito Block Engine client ready", "8 tip accounts · atomic execution"),
+      380
+    );
+  },
+  "/vault": (add) => add("INFO", "Vault Manager loaded", "Anchor · PDA seeds: [vault, authority]"),
+};
+
+// ── Main app ──────────────────────────────────────────────────────────────────
 const App: React.FC = () => {
   const txHistory = useTransactionHistory();
   const location = useLocation();
+  const { addLog, isTerminalOpen } = useLog();
+
+  // Boot sequence — fires once on mount
+  useEffect(() => {
+    addLog("INFO", "SolTx Explorer initialized", "v1.0.0");
+    const t1 = setTimeout(
+      () => addLog("INFO", "Connecting to Solana devnet RPC..."),
+      320
+    );
+    const t2 = setTimeout(
+      () => addLog("SUCCESS", "RPC endpoint established", "commitment: confirmed · cluster: devnet"),
+      920
+    );
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Emit a log every time the active route changes
+  useEffect(() => {
+    ROUTE_LOGS[location.pathname]?.(addLog);
+  }, [location.pathname, addLog]);
+
+  const terminalH = isTerminalOpen ? TERMINAL_OPEN_H : TERMINAL_CLOSED_H;
 
   return (
     <NavigationProvider>
-      <div className="flex min-h-screen bg-mesh relative overflow-hidden">
+      <div
+        className="flex min-h-screen bg-mesh relative overflow-hidden"
+        style={{ paddingBottom: terminalH }}
+      >
         {/* Decorative orbs — colors driven by CSS theme variables */}
         <div
           className="orb orb-primary animate-float"
@@ -81,6 +146,9 @@ const App: React.FC = () => {
         />
 
         <Sidebar />
+
+        {/* Wallet event watcher — renders nothing */}
+        <WalletLogger />
 
         <div className="flex-1 flex flex-col relative z-10">
           {/* Header */}
@@ -150,6 +218,9 @@ const App: React.FC = () => {
           </main>
         </div>
       </div>
+
+      {/* Fixed terminal — rendered outside the overflow:hidden container */}
+      <Terminal />
     </NavigationProvider>
   );
 };

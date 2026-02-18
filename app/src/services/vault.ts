@@ -34,6 +34,7 @@ export interface VaultState {
   totalWithdrawn: number;
   txCount: number;
   balance: number;
+  isPaused: boolean;
 }
 
 export async function fetchVaultState(
@@ -48,12 +49,19 @@ export async function fetchVaultState(
 
     const balance = accountInfo.lamports / LAMPORTS_PER_SOL;
 
+    // Vault layout: 8 discriminator + 32 authority + 8 total_deposited +
+    //               8 total_withdrawn + 8 tx_count + 1 bump + 1 is_paused = 66 bytes
+    // is_paused is at byte offset 65 (0-indexed)
+    const data = accountInfo.data;
+    const isPaused = data.length >= 66 ? data[65] === 1 : false;
+
     return {
       authority: authority.toBase58(),
       totalDeposited: 0,
       totalWithdrawn: 0,
       txCount: 0,
       balance,
+      isPaused,
     };
   } catch {
     return null;

@@ -59,7 +59,7 @@ async function getQuote(
     throw new Error(`Jupiter quote failed: ${response.statusText}`);
   }
 
-  return response.json();
+  return response.json() as Promise<JupiterQuote>;
 }
 
 async function getSwapTransaction(
@@ -82,8 +82,8 @@ async function getSwapTransaction(
     throw new Error(`Jupiter swap failed: ${response.statusText}`);
   }
 
-  const { swapTransaction } = await response.json();
-  return swapTransaction;
+  const data = await response.json() as { swapTransaction: string };
+  return data.swapTransaction;
 }
 
 async function jupiterSwap() {

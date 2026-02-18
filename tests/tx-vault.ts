@@ -42,11 +42,13 @@ describe("tx-vault", () => {
       })
       .rpc();
 
-    const vault = await program.account.vault.fetch(vaultPda);
+    const vault = await program.account.vault.fetch(vaultPda) as any;
     expect(vault.authority.toBase58()).to.equal(authority.publicKey.toBase58());
     expect(vault.totalDeposited.toNumber()).to.equal(0);
     expect(vault.totalWithdrawn.toNumber()).to.equal(0);
     expect(vault.txCount.toNumber()).to.equal(0);
+    // Kill switch must be off at initialization
+    expect(vault.isPaused).to.equal(false);
   });
 
   it("deposits SOL into the vault", async () => {
@@ -61,7 +63,7 @@ describe("tx-vault", () => {
       })
       .rpc();
 
-    const vault = await program.account.vault.fetch(vaultPda);
+    const vault = await program.account.vault.fetch(vaultPda) as any;
     expect(vault.totalDeposited.toNumber()).to.equal(depositAmount);
     expect(vault.txCount.toNumber()).to.equal(1);
 
@@ -85,7 +87,7 @@ describe("tx-vault", () => {
       })
       .rpc();
 
-    const vault = await program.account.vault.fetch(vaultPda);
+    const vault = await program.account.vault.fetch(vaultPda) as any;
     expect(vault.totalWithdrawn.toNumber()).to.equal(withdrawAmount);
     expect(vault.txCount.toNumber()).to.equal(2);
 
@@ -125,7 +127,7 @@ describe("tx-vault", () => {
   });
 
   it("logs a transaction record", async () => {
-    const vault = await program.account.vault.fetch(vaultPda);
+    const vault = await program.account.vault.fetch(vaultPda) as any;
     const txCount = vault.txCount.toNumber();
 
     const [txRecordPda] = PublicKey.findProgramAddressSync(
@@ -151,7 +153,7 @@ describe("tx-vault", () => {
       })
       .rpc();
 
-    const record = await program.account.transactionRecord.fetch(txRecordPda);
+    const record = await program.account.transactionRecord.fetch(txRecordPda) as any;
     expect(record.vault.toBase58()).to.equal(vaultPda.toBase58());
     expect(record.amount.toNumber()).to.equal(0.05 * LAMPORTS_PER_SOL);
     expect(record.description).to.equal("Test transfer to external wallet");
@@ -173,5 +175,80 @@ describe("tx-vault", () => {
     } catch (err: any) {
       expect(err.toString()).to.include("InvalidAmount");
     }
+  });
+
+  // ─── Kill Switch Tests ────────────────────────────────────────────────────
+
+  it("emergency_pause freezes the vault", async () => {
+    await program.methods
+      .emergencyPause()
+      .accounts({
+        vault: vaultPda,
+        authority: authority.publicKey,
+      })
+      .rpc();
+
+    const vault = await program.account.vault.fetch(vaultPda) as any;
+    expect(vault.isPaused).to.equal(true);
+  });
+
+  it("rejects deposit when vault is paused", async () => {
+    try {
+      await program.methods
+        .deposit(new anchor.BN(0.1 * LAMPORTS_PER_SOL))
+        .accounts({
+          vault: vaultPda,
+          depositor: authority.publicKey,
+          systemProgram: anchor.web3.SystemProgram.programId,
+        })
+        .rpc();
+
+      expect.fail("Should have thrown VaultPaused error");
+    } catch (err: any) {
+      expect(err.toString()).to.include("VaultPaused");
+    }
+  });
+
+  it("rejects withdrawal when vault is paused", async () => {
+    try {
+      await program.methods
+        .withdraw(new anchor.BN(0.01 * LAMPORTS_PER_SOL))
+        .accounts({
+          vault: vaultPda,
+          authority: authority.publicKey,
+        })
+        .rpc();
+
+      expect.fail("Should have thrown VaultPaused error");
+    } catch (err: any) {
+      expect(err.toString()).to.include("VaultPaused");
+    }
+  });
+
+  it("resume_vault re-enables operations", async () => {
+    await program.methods
+      .resumeVault()
+      .accounts({
+        vault: vaultPda,
+        authority: authority.publicKey,
+      })
+      .rpc();
+
+    const vaultAfterResume = await program.account.vault.fetch(vaultPda) as any;
+    expect(vaultAfterResume.isPaused).to.equal(false);
+
+    // Verify deposit works again after resume
+    await program.methods
+      .deposit(new anchor.BN(0.05 * LAMPORTS_PER_SOL))
+      .accounts({
+        vault: vaultPda,
+        depositor: authority.publicKey,
+        systemProgram: anchor.web3.SystemProgram.programId,
+      })
+      .rpc();
+
+    const vaultAfterDeposit = await program.account.vault.fetch(vaultPda) as any;
+    expect(vaultAfterDeposit.isPaused).to.equal(false);
+    expect(vaultAfterDeposit.txCount.toNumber()).to.be.greaterThan(0);
   });
 });

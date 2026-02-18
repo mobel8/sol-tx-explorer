@@ -1,14 +1,29 @@
+/**
+ * Jito bundle service — browser / wallet-adapter layer.
+ *
+ * Why no jito-ts SearcherClient here?
+ * The SearcherClient (gRPC) requires a Keypair with a secret key for auth.
+ * Browser wallets never expose the secret key — they only sign transactions.
+ * In a production system, the frontend would POST serialized transactions to a
+ * backend service which would then submit them via SearcherClient.
+ *
+ * For this devnet demo, submitBundleDevnetSim sends each transaction
+ * individually through the standard RPC, demonstrating the same bundle
+ * construction logic (tip account, ordering, compute budget).
+ */
+
 import {
   Connection,
-  Keypair,
   LAMPORTS_PER_SOL,
   PublicKey,
   SystemProgram,
   Transaction,
   ComputeBudgetProgram,
-  sendAndConfirmTransaction,
 } from "@solana/web3.js";
 
+// Official Jito tip accounts (mainnet).
+// Randomizing prevents front-running on tip accounts and distributes
+// rewards evenly across Jito-connected validators.
 const JITO_TIP_ACCOUNTS = [
   "96gYZGLnJYVFmbjzopPSU6QiEV5fGqZNyN9nmNhvrZU5",
   "HFqU5x63VTqvQss8hp11i4bVqkfRtQ7NmXwkihtHTAYc",
@@ -36,6 +51,11 @@ export function getRandomTipAccount(): PublicKey {
   return new PublicKey(JITO_TIP_ACCOUNTS[idx]);
 }
 
+/**
+ * Build a transaction with priority fee instructions prepended.
+ * Each bundle transaction gets its own compute budget — this is how
+ * Jito bundles work on mainnet (each tx is independent but ordered).
+ */
 export function createBundleTransaction(
   from: PublicKey,
   to: PublicKey,
@@ -45,6 +65,7 @@ export function createBundleTransaction(
   const tx = new Transaction();
 
   if (priorityFee > 0) {
+    // setComputeUnitPrice must come BEFORE the business instruction.
     tx.add(
       ComputeBudgetProgram.setComputeUnitPrice({ microLamports: priorityFee })
     );
@@ -62,14 +83,27 @@ export function createBundleTransaction(
   return tx;
 }
 
-export async function submitBundleSequential(
+/**
+ * Devnet simulation — sends bundle transactions sequentially.
+ *
+ * On mainnet, a production implementation would:
+ *   1. Serialize all VersionedTransactions.
+ *   2. POST them to a backend endpoint.
+ *   3. The backend creates a Bundle with jito-ts and calls searcherClient.sendBundle().
+ *   4. The Block Engine guarantees atomic, ordered inclusion in a single slot.
+ *
+ * The tip transaction is always appended LAST — this is the Jito protocol
+ * convention that allows the Block Engine to identify and validate the bundle.
+ */
+export async function submitBundleDevnetSim(
   connection: Connection,
   items: BundleItem[],
-  wallet: any, // WalletAdapter
+  wallet: any, // WalletAdapter — no secret key exposed
   tipAmountSol: number
 ): Promise<BundleResult[]> {
   const results: BundleResult[] = [];
 
+  // Submit each transfer transaction in order (simulating bundle ordering)
   for (const item of items) {
     const start = Date.now();
     try {
@@ -104,7 +138,7 @@ export async function submitBundleSequential(
     }
   }
 
-  // Tip transaction
+  // Tip transaction — always last, as required by the Jito bundle protocol.
   const tipStart = Date.now();
   try {
     const tipTx = new Transaction().add(

@@ -23,10 +23,11 @@
 **SolTx Explorer** est une application web de gestion et d'exploration de transactions Solana.
 Elle permet de :
 
-- **Envoyer des SOL** manuellement vers n'importe quelle adresse
-- **Swapper des tokens** (échanger SOL contre USDC et vice-versa) via Jupiter
-- **Simuler des bundles Jito** (groupes de transactions atomiques)
-- **Gérer un vault on-chain** (coffre-fort de SOL sécurisé par un smart contract Rust)
+- **Envoyer des SOL** manuellement vers n'importe quelle adresse, avec priority fees configurables
+- **Swapper des tokens** (échanger SOL contre USDC et vice-versa) via Jupiter Aggregator
+- **Soumettre des bundles Jito** — vrais bundles atomiques via le SDK `jito-ts` (avec fallback devnet)
+- **Gérer un vault on-chain** — coffre-fort de SOL sécurisé par un smart contract Rust (7 instructions)
+- **Kill Switch** — mécanisme d'arrêt d'urgence pour le vault (freezer/reprendre les opérations)
 - **Visualiser l'historique** de toutes les transactions effectuées
 
 C'est un projet portfolio démontrant des compétences en développement Rust/Solana côté on-chain, et React/TypeScript côté frontend.
@@ -71,7 +72,7 @@ Unité de temps sur Solana. Un nouveau slot est créé toutes les ~400 milliseco
 sol-tx-explorer/
 │
 ├── programs/tx-vault/          ← Smart contract Rust (on-chain)
-│   └── src/lib.rs              ← Code du programme Solana
+│   └── src/lib.rs              ← 7 instructions du programme
 │
 ├── app/                        ← Frontend React (off-chain)
 │   └── src/
@@ -83,16 +84,21 @@ sol-tx-explorer/
 ├── scripts/                    ← Scripts CLI TypeScript
 │   ├── send-tx.ts              ← Envoyer des SOL en ligne de commande
 │   ├── jupiter-swap.ts         ← Swap de tokens en CLI
-│   ├── jito-bundle.ts          ← Soumettre un bundle Jito en CLI
+│   ├── jito-bundle.ts          ← Bundle Jito réel (SDK + fallback devnet)
 │   └── optimized-tx.ts         ← Benchmark des priority fees
 │
 └── tests/                      ← Tests du smart contract
-    └── tx-vault.ts             ← 6 cas de test Anchor
+    └── tx-vault.ts             ← 10 cas de test Anchor
 ```
 
 **Flux général :**
 ```
 Navigateur (React) → Phantom Wallet (signe les transactions) → RPC Solana → Blockchain Devnet
+```
+
+**Flux Jito (mainnet uniquement) :**
+```
+Script CLI → searcherClient (gRPC) → Bundle (VersionedTransaction[]) → Block Engine → Validateur Jito
 ```
 
 ---
@@ -126,7 +132,9 @@ pub struct Vault {
     pub total_withdrawn: u64,    // Total cumulé des retraits (en lamports)
     pub tx_count: u64,           // Nombre de transactions effectuées
     pub bump: u8,                // Numéro technique du PDA (canonique)
+    pub is_paused: bool,         // Kill switch — true = vault gelé en urgence
 }
+// Taille en mémoire : 8 (discriminator) + 32 + 8 + 8 + 8 + 1 + 1 = 66 bytes
 ```
 
 ### 4.3 — Structure TransactionRecord
@@ -144,23 +152,25 @@ pub struct TransactionRecord {
 }
 ```
 
-### 4.4 — Les 4 instructions du programme
+### 4.4 — Les 7 instructions du programme
 
 #### `initialize_vault`
 Crée le vault PDA pour un wallet.
 - Ne peut être appelé qu'une fois par wallet
-- Le vault est vide au départ
+- Le vault est vide et actif (`is_paused = false`) au départ
 - Émet l'événement `VaultCreated`
 
 #### `deposit(amount: u64)`
 Transfère des SOL depuis le wallet vers le vault.
+- **Bloqué si le vault est en pause** (`require!(!vault.is_paused)`)
 - Utilise un **CPI** (appel au System Program pour le vrai transfert de SOL)
 - Incrémente `total_deposited` et `tx_count`
 - Émet l'événement `DepositEvent`
 
 #### `withdraw(amount: u64)`
 Retire des SOL du vault vers le wallet propriétaire.
-- **Sécurisé** : seul l'`authority` peut retirer
+- **Bloqué si le vault est en pause** (`require!(!vault.is_paused)`)
+- **Sécurisé** : seul l'`authority` peut retirer (contrainte `has_one`)
 - Vérifie que le vault a assez de fonds (moins le loyer minimum)
 - Émet l'événement `WithdrawEvent`
 
@@ -170,6 +180,27 @@ Enregistre un événement de transaction on-chain.
 - Utile pour avoir un historique immuable sur la blockchain
 - Émet l'événement `TransactionLogged`
 
+#### `emergency_pause`
+**Kill Switch — arrêt d'urgence du vault.**
+- Seul l'`authority` peut l'appeler
+- Met `is_paused = true` on-chain
+- Après cet appel, tout dépôt ou retrait est refusé avec l'erreur `VaultPaused`
+- Émet l'événement `VaultPaused { vault, authority, timestamp }`
+- Cas d'usage : bug détecté, compromission suspectée, maintenance critique
+
+#### `resume_vault`
+**Réactive le vault après une pause d'urgence.**
+- Seul l'`authority` peut l'appeler
+- Met `is_paused = false` on-chain
+- Les dépôts et retraits redeviennent possibles immédiatement
+- Émet l'événement `VaultResumed { vault, authority, timestamp }`
+
+#### `close_vault`
+**Ferme définitivement le vault et récupère le loyer.**
+- Seul l'`authority` peut l'appeler
+- Utilise la contrainte Anchor `close = authority` : tous les lamports restants (y compris le loyer du compte) sont transférés vers l'authority
+- Le compte PDA est fermé définitivement sur la blockchain
+
 ### 4.5 — CPI (Cross-Program Invocation)
 
 Un **CPI** est un appel d'un programme vers un autre programme.
@@ -178,10 +209,15 @@ Dans `deposit`, le contrat tx-vault appelle le **System Program** de Solana pour
 ### 4.6 — Events (Événements)
 
 Les événements sont des données émises par le programme, indexables par des services off-chain.
-- `VaultCreated { vault, authority }`
-- `DepositEvent { vault, depositor, amount, total_deposited }`
-- `WithdrawEvent { vault, authority, amount, total_withdrawn }`
-- `TransactionLogged { vault, tx_type, amount, description, timestamp }`
+
+| Événement | Instruction | Données |
+|-----------|-------------|---------|
+| `VaultCreated` | `initialize_vault` | `vault`, `authority` |
+| `DepositEvent` | `deposit` | `vault`, `depositor`, `amount`, `total_deposited` |
+| `WithdrawEvent` | `withdraw` | `vault`, `authority`, `amount`, `total_withdrawn` |
+| `TransactionLogged` | `log_transaction` | `vault`, `tx_type`, `amount`, `description`, `timestamp` |
+| `VaultPaused` | `emergency_pause` | `vault`, `authority`, `timestamp` |
+| `VaultResumed` | `resume_vault` | `vault`, `authority`, `timestamp` |
 
 ### 4.7 — Erreurs du programme
 
@@ -192,6 +228,22 @@ Les événements sont des données émises par le programme, indexables par des 
 | `Unauthorized` | Seul l'authority peut effectuer cette action |
 | `Overflow` | Dépassement arithmétique |
 | `DescriptionTooLong` | Description > 128 caractères |
+| `VaultPaused` | Vault gelé — arrêt d'urgence actif, contacter l'authority |
+
+### 4.8 — Tests du programme (10 cas)
+
+```
+✓ initializes a vault                      → vault vide, is_paused = false
+✓ deposits SOL into the vault              → solde augmente, tx_count = 1
+✓ withdraws SOL from the vault             → solde diminue, authority récupère les SOL
+✓ prevents unauthorized withdrawal         → erreur de contrainte si mauvaise authority
+✓ logs a transaction record                → TransactionRecord créé on-chain
+✓ rejects zero-amount deposit              → erreur InvalidAmount
+✓ emergency_pause freezes the vault        → is_paused = true
+✓ rejects deposit when vault is paused     → erreur VaultPaused
+✓ rejects withdrawal when vault is paused  → erreur VaultPaused
+✓ resume_vault re-enables operations       → is_paused = false, dépôt fonctionne
+```
 
 ---
 
@@ -260,16 +312,25 @@ Interface d'échange de tokens via **Jupiter Aggregator** — le meilleur agrég
 
 Simule la soumission de **bundles Jito** — groupes de transactions exécutés dans un ordre précis.
 
-**Fonctionnalités :**
+**Mode frontend (navigateur) :**
+Le navigateur ne peut pas accéder au SDK Jito directement (le `SearcherClient` nécessite une clé privée et un accès gRPC serveur). Le frontend envoie donc les transactions de manière séquentielle sur devnet pour simuler le comportement.
+
+**Mode CLI (mainnet) :**
+Le script `scripts/jito-bundle.ts` utilise le vrai SDK `jito-ts` :
+```
+searcherClient (gRPC) → Bundle (VersionedTransaction[]) → sendBundle → onBundleResult
+```
+
+**Architecture production (si backend) :**
+```
+Frontend → POST /api/bundle → Backend Node.js → SearcherClient → Block Engine Jito
+```
+
+**Fonctionnalités de la page :**
 - Ajouter plusieurs transactions dans un bundle
 - Configurer chaque transaction : destinataire, montant, priority fee
 - Définir un **tip** (pourboire) envoyé aux validateurs Jito
 - Soumettre le bundle et voir les résultats transaction par transaction
-
-**Résultats :**
-- Signature et statut de chaque transaction
-- Temps d'exécution
-- Taux de succès global
 
 ---
 
@@ -277,14 +338,20 @@ Simule la soumission de **bundles Jito** — groupes de transactions exécutés 
 
 **URL :** `/vault`
 
-Interface pour interagir avec le smart contract tx-vault déployé on-chain.
+Interface complète pour interagir avec le smart contract tx-vault déployé on-chain.
 
-**Fonctionnalités :**
+**Fonctionnalités de base :**
 - Voir l'adresse PDA du vault (calculée depuis le wallet connecté)
 - **Initialiser** le vault (création on-chain, une seule fois)
 - **Déposer** des SOL dans le vault
 - **Retirer** des SOL depuis le vault
 - Voir le solde, le total déposé et le nombre de transactions
+
+**Kill Switch (nouveauté) :**
+- **Badge de statut** : `RUNNING` (vert) ou `⚠ PAUSED` (rouge) selon l'état du vault
+- **Emergency Pause** : gèle le vault immédiatement — plus aucun dépôt/retrait possible
+- **Resume Vault** : réactive le vault — les opérations reprennent normalement
+- Le statut `is_paused` est lu directement depuis les données du compte on-chain (byte 65)
 
 > Note : le vault est une adresse PDA — sans clé privée, contrôlée uniquement par le programme.
 
@@ -325,8 +392,10 @@ Interface pour interagir avec le smart contract tx-vault déployé on-chain.
 | **Bundle** | Groupe de transactions exécutées dans un ordre garanti |
 | **MEV** | Miner/Maximal Extractable Value — profits tirés de l'ordre des transactions |
 | **Tip** | Pourboire payé aux validateurs Jito pour inclure un bundle |
+| **SearcherClient** | Client gRPC du SDK Jito pour soumettre des bundles au Block Engine |
+| **VersionedTransaction** | Format v0 de transaction Solana (requis par Jito Bundle) |
+| **Kill Switch** | Mécanisme d'arrêt d'urgence on-chain (`is_paused` bool) |
 | **IDL** | Interface Definition Language — fichier JSON décrivant un programme Anchor |
-| **Anchor** | Framework facilitant l'écriture de smart contracts Solana en Rust |
 | **SBF** | Solana Berkeley Packet Filter — format binaire des programmes Solana |
 | **Event** | Données émises par un smart contract, indexables off-chain |
 | **Confirmed** | Niveau de finalité d'une transaction (quasi-définitif) |
@@ -401,11 +470,22 @@ npm run send-tx
 # Swap Jupiter
 npm run jupiter-swap
 
-# Bundle Jito
+# Bundle Jito (mainnet réel ou fallback devnet)
 npm run jito-bundle
 
 # Benchmark de priority fees
 npm run optimized-tx
+```
+
+### Construire le programme Anchor
+```bash
+export PATH="$HOME/.cargo/bin:$HOME/.local/share/solana/install/active_release/bin:$PATH"
+
+# Compiler le binaire SBF
+cargo build-sbf
+
+# Lancer les 10 tests
+anchor test
 ```
 
 ---
@@ -414,7 +494,7 @@ npm run optimized-tx
 
 | Couche | Technologie | Rôle |
 |--------|------------|------|
-| Smart Contract | Rust + Anchor 0.29 | Programme on-chain (tx-vault) |
+| Smart Contract | Rust + Anchor 0.29 | Programme on-chain (tx-vault) — 7 instructions |
 | Blockchain | Solana Devnet | Réseau de test |
 | Frontend | React 18 + TypeScript | Interface utilisateur |
 | Build tool | Vite | Bundler ultra-rapide |
@@ -423,5 +503,6 @@ npm run optimized-tx
 | Graphiques | Recharts | Visualisation de données |
 | Wallet | @solana/wallet-adapter | Connexion Phantom/Solflare |
 | Swap | Jupiter API v6 | Agrégateur DEX |
-| Bundles | Jito | MEV et bundles atomiques |
+| Bundles | jito-ts SDK | MEV et bundles atomiques réels (SearcherClient + gRPC) |
 | Routing | React Router v6 | Navigation entre pages |
+| Tests | Mocha + Chai (Anchor) | 10 cas de test du programme on-chain |

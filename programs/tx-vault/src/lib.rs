@@ -10,6 +10,7 @@ declare_id!("11111111111111111111111111111111"); // Placeholder - updated after 
 /// - SOL deposits via CPI (Cross-Program Invocation)
 /// - Authorized withdrawals with signature verification
 /// - On-chain transaction logging with event emission
+/// - Emergency pause / resume (kill switch) for incident response
 #[program]
 pub mod tx_vault {
     use super::*;
@@ -23,6 +24,7 @@ pub mod tx_vault {
         vault.total_withdrawn = 0;
         vault.tx_count = 0;
         vault.bump = ctx.bumps.vault;
+        vault.is_paused = false;
 
         emit!(VaultCreated {
             vault: vault.key(),
@@ -35,6 +37,8 @@ pub mod tx_vault {
 
     /// Deposit SOL into the vault via CPI to the System Program.
     pub fn deposit(ctx: Context<Deposit>, amount: u64) -> Result<()> {
+        // Kill switch: reject all deposits when vault is paused
+        require!(!ctx.accounts.vault.is_paused, VaultError::VaultPaused);
         require!(amount > 0, VaultError::InvalidAmount);
 
         // CPI: Transfer SOL from depositor to vault PDA
@@ -68,6 +72,8 @@ pub mod tx_vault {
 
     /// Withdraw SOL from the vault. Only the authority can withdraw.
     pub fn withdraw(ctx: Context<Withdraw>, amount: u64) -> Result<()> {
+        // Kill switch: reject all withdrawals when vault is paused
+        require!(!ctx.accounts.vault.is_paused, VaultError::VaultPaused);
         require!(amount > 0, VaultError::InvalidAmount);
 
         let vault = &mut ctx.accounts.vault;
@@ -79,8 +85,10 @@ pub mod tx_vault {
 
         require!(amount <= available, VaultError::InsufficientFunds);
 
-        // Transfer SOL from vault PDA to authority
-        // For PDA-owned accounts, we modify lamports directly
+        // Transfer SOL from vault PDA to authority.
+        // For PDA-owned accounts, we modify lamports directly — a CPI via
+        // system_program::transfer would fail because the vault PDA is owned
+        // by this program, not by the System Program.
         **vault.to_account_info().try_borrow_mut_lamports()? -= amount;
         **ctx
             .accounts
@@ -102,6 +110,51 @@ pub mod tx_vault {
         });
 
         msg!("Withdrew {} lamports from vault", amount);
+        Ok(())
+    }
+
+    /// Freeze all vault operations immediately.
+    /// Only the authority can pause. Idempotent (pausing an already-paused
+    /// vault is a no-op rather than an error, for safe retries under load).
+    pub fn emergency_pause(ctx: Context<EmergencyPause>) -> Result<()> {
+        let vault = &mut ctx.accounts.vault;
+        vault.is_paused = true;
+
+        emit!(VaultPaused {
+            vault: vault.key(),
+            authority: ctx.accounts.authority.key(),
+            timestamp: Clock::get()?.unix_timestamp,
+        });
+
+        msg!(
+            "VAULT PAUSED — emergency stop activated by {}",
+            ctx.accounts.authority.key()
+        );
+        Ok(())
+    }
+
+    /// Resume vault operations after an emergency pause.
+    /// Only the authority can resume.
+    pub fn resume_vault(ctx: Context<EmergencyPause>) -> Result<()> {
+        let vault = &mut ctx.accounts.vault;
+        vault.is_paused = false;
+
+        emit!(VaultResumed {
+            vault: vault.key(),
+            authority: ctx.accounts.authority.key(),
+            timestamp: Clock::get()?.unix_timestamp,
+        });
+
+        msg!("Vault resumed by {}", ctx.accounts.authority.key());
+        Ok(())
+    }
+
+    /// Close the vault, reclaiming all SOL (balance + rent) to the authority.
+    /// Irreversible — the account is deleted from the blockchain.
+    pub fn close_vault(_ctx: Context<CloseVault>) -> Result<()> {
+        // The `close = authority` constraint on the vault account handles
+        // zeroing the discriminator and transferring all lamports to authority.
+        msg!("Vault closed — all funds returned to authority");
         Ok(())
     }
 
@@ -146,7 +199,7 @@ pub mod tx_vault {
 /// Main vault account, stored as a PDA.
 #[account]
 pub struct Vault {
-    /// The authority who controls this vault (can withdraw).
+    /// The authority who controls this vault (can withdraw and pause).
     pub authority: Pubkey,
     /// Total SOL deposited (cumulative, in lamports).
     pub total_deposited: u64,
@@ -156,11 +209,13 @@ pub struct Vault {
     pub tx_count: u64,
     /// PDA bump seed.
     pub bump: u8,
+    /// Kill switch: when true, all deposits and withdrawals are rejected.
+    pub is_paused: bool,
 }
 
 impl Vault {
-    /// Space needed: 8 (discriminator) + 32 + 8 + 8 + 8 + 1 = 65
-    pub const SPACE: usize = 8 + 32 + 8 + 8 + 8 + 1;
+    /// Space: 8 (discriminator) + 32 + 8 + 8 + 8 + 1 + 1 = 66
+    pub const SPACE: usize = 8 + 32 + 8 + 8 + 8 + 1 + 1;
 }
 
 /// On-chain transaction record for audit logging.
@@ -247,6 +302,39 @@ pub struct Withdraw<'info> {
     pub authority: Signer<'info>,
 }
 
+/// Shared context for emergency_pause and resume_vault.
+/// Only the vault authority can call either instruction.
+#[derive(Accounts)]
+pub struct EmergencyPause<'info> {
+    #[account(
+        mut,
+        seeds = [b"vault", vault.authority.as_ref()],
+        bump = vault.bump,
+        has_one = authority @ VaultError::Unauthorized,
+    )]
+    pub vault: Account<'info, Vault>,
+
+    pub authority: Signer<'info>,
+}
+
+/// Close the vault and reclaim rent to the authority.
+/// The `close = authority` constraint zeroes the account and
+/// transfers all lamports (balance + rent) to authority.
+#[derive(Accounts)]
+pub struct CloseVault<'info> {
+    #[account(
+        mut,
+        close = authority,
+        seeds = [b"vault", vault.authority.as_ref()],
+        bump = vault.bump,
+        has_one = authority @ VaultError::Unauthorized,
+    )]
+    pub vault: Account<'info, Vault>,
+
+    #[account(mut)]
+    pub authority: Signer<'info>,
+}
+
 #[derive(Accounts)]
 pub struct LogTransaction<'info> {
     #[account(
@@ -303,6 +391,20 @@ pub struct WithdrawEvent {
 }
 
 #[event]
+pub struct VaultPaused {
+    pub vault: Pubkey,
+    pub authority: Pubkey,
+    pub timestamp: i64,
+}
+
+#[event]
+pub struct VaultResumed {
+    pub vault: Pubkey,
+    pub authority: Pubkey,
+    pub timestamp: i64,
+}
+
+#[event]
 pub struct TransactionLogged {
     pub vault: Pubkey,
     pub tx_type: TxType,
@@ -331,4 +433,7 @@ pub enum VaultError {
 
     #[msg("Description too long: max 128 characters")]
     DescriptionTooLong,
+
+    #[msg("Vault is paused — emergency stop is active, contact the authority")]
+    VaultPaused,
 }
