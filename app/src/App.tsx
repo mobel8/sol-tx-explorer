@@ -5,7 +5,7 @@ import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { Sidebar } from "./components/Sidebar";
 import { PageTransition } from "./components/PageTransition";
-import { Terminal, TERMINAL_OPEN_H, TERMINAL_CLOSED_H } from "./components/Terminal";
+import { Terminal } from "./components/Terminal";
 import { useTransactionHistory } from "./hooks/useTransactionHistory";
 import { NavigationProvider } from "./contexts/NavigationContext";
 import { useLog } from "./contexts/LogContext";
@@ -87,7 +87,7 @@ const ROUTE_LOGS: Record<string, (addLog: ReturnType<typeof useLog>["addLog"]) =
 const App: React.FC = () => {
   const txHistory = useTransactionHistory();
   const location = useLocation();
-  const { addLog, isTerminalOpen } = useLog();
+  const { addLog } = useLog();
 
   // Boot sequence — fires once on mount
   useEffect(() => {
@@ -111,13 +111,10 @@ const App: React.FC = () => {
     ROUTE_LOGS[location.pathname]?.(addLog);
   }, [location.pathname, addLog]);
 
-  const terminalH = isTerminalOpen ? TERMINAL_OPEN_H : TERMINAL_CLOSED_H;
-
   return (
     <NavigationProvider>
       <div
         className="flex min-h-screen bg-mesh relative overflow-hidden"
-        style={{ paddingBottom: terminalH }}
       >
         {/* Decorative orbs — colors driven by CSS theme variables */}
         <div

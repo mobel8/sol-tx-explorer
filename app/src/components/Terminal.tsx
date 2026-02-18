@@ -56,8 +56,9 @@ export const Terminal: React.FC = () => {
 
   return (
     <div
-      className="fixed bottom-0 left-0 right-0 z-30 flex flex-col border-t border-slate-700/50"
+      className="fixed bottom-0 right-0 z-30 flex flex-col border border-slate-700/50 rounded-tl-xl overflow-hidden"
       style={{
+        width: 420,
         height: isTerminalOpen ? TERMINAL_OPEN_H : TERMINAL_CLOSED_H,
         transition: "height 0.18s ease-in-out",
       }}
