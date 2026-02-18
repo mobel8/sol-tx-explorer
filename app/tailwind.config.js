@@ -49,6 +49,7 @@ export default {
         "fade-up": "fade-up 0.5s ease-out",
         "spin-slow": "spin-slow 8s linear infinite",
         "gradient-x": "gradient-x 3s ease infinite",
+        "ping-slow": "ping-slow 2s cubic-bezier(0,0,0.2,1) infinite",
       },
       backgroundSize: {
         "200%": "200% 200%",

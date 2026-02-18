@@ -9,13 +9,14 @@ import {
   Shield,
 } from "lucide-react";
 import { NetworkBadge } from "./NetworkBadge";
+import { ThemeToggle } from "./ThemeToggle";
 
 const NAV_ITEMS = [
-  { path: "/", label: "Dashboard", icon: LayoutDashboard },
-  { path: "/tx-builder", label: "TX Builder", icon: ArrowRight },
-  { path: "/swap", label: "Jupiter Swap", icon: ArrowLeftRight },
-  { path: "/bundles", label: "Bundle Sim", icon: Layers },
-  { path: "/vault", label: "Vault", icon: Shield },
+  { path: "/",           label: "Dashboard",    icon: LayoutDashboard },
+  { path: "/tx-builder", label: "TX Builder",   icon: ArrowRight },
+  { path: "/swap",       label: "Jupiter Swap", icon: ArrowLeftRight },
+  { path: "/bundles",    label: "Bundle Sim",   icon: Layers },
+  { path: "/vault",      label: "Vault",        icon: Shield },
 ];
 
 export const Sidebar: React.FC = () => {
@@ -54,18 +55,27 @@ export const Sidebar: React.FC = () => {
               {isActive && (
                 <motion.div
                   layoutId="sidebar-active"
-                  className="absolute inset-0 rounded-xl bg-solana-purple/15 border border-solana-purple/30"
-                  transition={{ type: "spring", stiffness: 350, damping: 30 }}
+                  className="absolute inset-0 rounded-xl"
+                  style={{
+                    background: "rgba(var(--primary-rgb), 0.14)",
+                    border: "1px solid rgba(var(--primary-rgb), 0.32)",
+                    boxShadow: "inset 0 1px 0 rgba(255,255,255,0.06)",
+                  }}
+                  transition={{ type: "spring", stiffness: 380, damping: 32 }}
                 />
               )}
               <div
-                className={`relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-colors ${
+                className={`relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all duration-200 ${
                   isActive
-                    ? "text-solana-purple font-medium"
+                    ? "font-semibold"
                     : "text-gray-400 hover:text-white hover:bg-white/5"
                 }`}
+                style={isActive ? { color: "var(--primary)" } : undefined}
               >
-                <Icon className="w-4.5 h-4.5" />
+                <Icon
+                  className="w-4 h-4 flex-shrink-0"
+                  style={isActive ? { filter: "drop-shadow(0 0 6px var(--primary))" } : undefined}
+                />
                 {item.label}
               </div>
             </NavLink>
@@ -74,12 +84,24 @@ export const Sidebar: React.FC = () => {
       </nav>
 
       {/* Footer */}
-      <div className="mt-auto pt-4 border-t border-solana-border/50">
+      <div
+        className="mt-auto pt-4 space-y-3"
+        style={{ borderTop: "1px solid rgba(var(--primary-rgb), 0.18)" }}
+      >
+        {/* Theme switcher */}
+        <ThemeToggle />
+
+        {/* Tech badges */}
         <div className="flex flex-wrap gap-1.5 justify-center">
           {["Solana", "Jupiter", "Jito", "Anchor"].map((tech) => (
             <span
               key={tech}
-              className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-solana-purple/10 text-solana-purple/70 border border-solana-purple/20"
+              className="px-2 py-0.5 rounded-full text-[10px] font-mono"
+              style={{
+                background: "rgba(var(--primary-rgb), 0.08)",
+                color: "rgba(var(--primary-rgb), 0.65)",
+                border: "1px solid rgba(var(--primary-rgb), 0.18)",
+              }}
             >
               {tech}
             </span>
